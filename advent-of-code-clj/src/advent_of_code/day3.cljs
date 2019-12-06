@@ -57,13 +57,34 @@
     [route]
     (let [plotted [[0 0]]
           wire (reduce (fn [acc, v]
-                         (let [fff (parse_to_map v)
+                         (let [current (parse_to_map v)
                                last (last acc)
-                               diff (plot_all_points_in_path last fff)]
-                           (concat acc diff)))
+                               new_path (plot_all_points_in_path last current)]
+                           (concat acc new_path)))
                        plotted
                        route)]
       wire))
+
+  (defn parse_to_coord
+    [instruction]
+    (let [steps (Integer. (re-find (re-pattern "\\d+") instruction))
+          direction (re-find (re-pattern "\\w") instruction)]
+      (case direction
+        "R" [0 steps]
+        "L" [0 (* -1 steps)]
+        "U" [steps 0]
+        "D" [(* -1 steps) 0])))
+
+  (defn plot-from-coord
+    [current next]
+    (if (= 0 (first next))
+      (move-x current next)
+      (move-y current next)))
+
+  (defn move-x
+    [current next]
+    ())
+
 
   (defn find_closest_to_origin
     [intersections]
@@ -106,7 +127,7 @@
       (clojure.pprint/pprint (str "A1: manhattan distance to closest intersection to origin = " closest_to_origin))
       (clojure.pprint/pprint (str "A2: manhattan shortest distance of combined path for each route to intersection = " shortest_path_to_intersection)))
 
-  
+    (clojure.pprint/pprint (parse_to_coord "D12"))
 
 
 
