@@ -17,15 +17,6 @@
     (concat (take (- 5 (count number)) [0 0 0 0 0]) number)
     number))
 
-(defn read-opcode
-  [opcode]
-  (let [code (pad-num (split-num opcode))
-        mode-3 (first code)
-        mode-2 (second code)
-        mode-1 (second (rest code))
-        n-opcode (reduce (fn [a v] (Integer. (str a v))) [(second (rest (rest code))) (last code)])]
-    [n-opcode mode-1 mode-2 mode-3]))
-
 (defn position-value
   [input offset]
   (get input offset))
@@ -34,56 +25,76 @@
   [input offset]
   (get input (get input offset)))
 
+(defn read-opcode
+  [input position]
+  (let [code (pad-num (split-num (get input position)))
+        [mode-3 mode-2 mode-1] (take 3 code)
+        verb (case mode-2
+                0 (address-value input (+ 2 position))
+                1 (position-value input (+ 2 position)))
+        noun (case mode-1
+                0 (address-value input (+ 1 position))
+                1 (position-value input (+ 1 position)))
+        opcode (reduce (fn [a v] (Integer. (str a v))) [(second (rest (rest code))) (last code)])
+        target (case opcode
+                 03 (position-value input (+ 1 position))
+                 04 nil
+                 05 nil
+                 06 nil
+                 (position-value input (+ 3 position)))
+        [output next-position] (case opcode
+                                 01 [(+ noun verb) (+ 4 position)]
+                                 02 [(* noun verb) (+ 4 position)]
+                                 03 [(Integer. (read-line)) (+ 2 position)]
+                                 04 [(println (address-value input (+ 1 position))) (+ 2 position)]
+                                 05 (if (not (= noun 0))
+                                      [nil verb]
+                                      [nil (+ 3 position)])
+                                 06 (if (= noun 0)
+                                      [nil verb]
+                                      [nil (+ 3 position)])
+                                 07 (if (< noun verb)
+                                      [1 (+ 4 position)]
+                                      [0 (+ 4 position)])
+                                 8 (if (= noun verb)
+                                       [1 (+ 4 position)]
+                                       [0 (+ 4 position)])
+
+                                 99 [nil (+ 2 position)]
+                                 nil)
+        end (or (= 99 opcode) (>= next-position (count input)))]
+    [opcode target output next-position end]))
+
 (defn run-intcode
   [input]
   (loop [position 0
          input input]
-    (let [[opcode mode-1 mode-2 mode-3] (read-opcode (get input position))
-          next-position (case opcode
-                           01 (+ 4 position)
-                           02 (+ 4 position)
-                           03 (+ 2 position)
-                           04 (+ 2 position)
-                           99 (+ 2 position)
-                          nil)
-          end (or (= 99 opcode) (>= (+ 4 position) (count input)))
-          noun (case mode-1
-                 0 (address-value input (+ 1 position))
-                 1 (position-value input (+ 1 position)))
-          verb (case mode-2
-                 0 (address-value input (+ 2 position))
-                 1 (position-value input (+ 2 position)))
-          target (case opcode
-                   03 (position-value input (+ 1 position))
-                   (position-value input (+ 3 position)))
-          output (case opcode
-                   01 (+ noun verb)
-                   02 (* noun verb)
-                   03 (do
-                        (println "input '1':")
-                        (Integer. (read-line)))
-                   04 nil
-                   99 nil
-                   nil)
-
+    (let [[opcode target output next-position end] (read-opcode input position)
           result (if output
                    (reduce-kv (fn [m k v]
 
                                (if (and (= k target) (not (= opcode 04)))
                                  (conj m output)
                                  (conj m v)))
-
                            []
                            input)
                    input)]
-      (if (= opcode 04)
-        (do
-          (println (address-value input (+ 1 position)))))
       (if end
         (first result)
         (recur next-position result)))))
 
 (defn -main
   []
-  (println "day 5: prob 1")
+  (println "day 5:")
+  (println "prob 1: input '1' | prob 2: input '5' to start")
   (run-intcode inp-2))
+
+
+  ; (println "input is equal to 8?")
+  ; (run-intcode [3,3,1108,-1,8,3,4,3,99])
+  ; (println "input is less than 8")
+  ; (run-intcode [3,3,1107,-1,8,3,4,3,99])
+  ; (println "input is equal to 8?")
+  ; (run-intcode [3,9,8,9,10,9,4,9,99,-1,8])
+  ; (println "input is less than 8")
+  ; (run-intcode [3,9,7,9,10,9,4,9,99,-1,8])
